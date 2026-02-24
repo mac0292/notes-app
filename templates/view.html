@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>{{ note["title"] }}</h1>
+<p class="date">{{ note["created"] }}</p>
+
+<div class="note-content">
+    {{ note["content"] }}
+</div>
+
+<div class="actions">
+    <a href="/edit/{{ note['id'] }}">✏️ Edit</a>
+    <a href="/delete/{{ note['id'] }}" 
+       onclick="return confirm('Are you sure?')">🗑️ Delete</a>
+    <a href="/">← Back</a>
+</div>
+
+{% endblock %}

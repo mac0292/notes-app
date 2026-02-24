@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>{{ "Edit Note" if note else "New Note" }}</h1>
+
+<form method="POST">
+    <input
+        type="text"
+        name="title"
+        placeholder="Note title..."
+        value="{{ note['title'] if note else '' }}"
+        required
+    >
+    <textarea
+        name="content"
+        placeholder="Write your note here..."
+        required
+    >{{ note["content"] if note else "" }}</textarea>
+    <button type="submit">Save Note</button>
+</form>
+
+{% endblock %}
