@@ -2,16 +2,28 @@ from flask import Flask, render_template, request, redirect, url_for
 from database import get_connection, init_db
 
 app = Flask(__name__)
+init_db()        # ← this MUST be here, outside of main block
 
-# ─── Homepage: show all notes ───────────────────────────
+# ─── Homepage: show all notes + search ──────────────────
 @app.route("/")
 def index():
+    query = request.args.get("q", "")
     conn = get_connection()
-    notes = conn.execute(
-        "SELECT * FROM notes ORDER BY created DESC"
-    ).fetchall()
+
+    if query:
+        notes = conn.execute(
+            """SELECT * FROM notes 
+               WHERE title LIKE ? OR content LIKE ? 
+               ORDER BY created DESC""",
+            (f"%{query}%", f"%{query}%")
+        ).fetchall()
+    else:
+        notes = conn.execute(
+            "SELECT * FROM notes ORDER BY created DESC"
+        ).fetchall()
+
     conn.close()
-    return render_template("index.html", notes=notes)
+    return render_template("index.html", notes=notes, query=query)
 
 # ─── New Note ───────────────────────────────────────────
 @app.route("/new", methods=["GET", "POST"])
@@ -70,5 +82,4 @@ def delete_note(note_id):
 
 # ─── Start the app ───────────────────────────────────────
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
