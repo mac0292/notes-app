@@ -9,7 +9,11 @@
 
     <nav>
         <a href="/">📝 My Notes</a>
-        <a href="/new">+ New Note</a>
+        {% if session.user_id %}
+            <span>👤 {{ session.username }}</span>
+            <a href="/new">+ New Note</a>
+            <a href="/logout">Logout</a>
+        {% endif %}
     </nav>
 
     <div class="container">
