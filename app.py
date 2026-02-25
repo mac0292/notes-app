@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import get_connection, init_db
+import os
 
 app = Flask(__name__)
-app.secret_key = "your-secret-key-change-this"
+app.secret_key = os.environ.get("SECRET_KEY"),
 init_db()
 
 # ─── Homepage ────────────────────────────────────────────
