@@ -4,7 +4,7 @@ from database import get_connection, init_db
 import os
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY"),
+app.secret_key = os.environ.get("SECRET_KEY")
 init_db()
 
 # ─── Homepage ────────────────────────────────────────────
