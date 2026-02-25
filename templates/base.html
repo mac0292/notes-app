@@ -8,10 +8,10 @@
 <body>
 
     <nav>
-        <a href="/">📝 My Notes</a>
+        <a href="/">📝 Notes</a>
         {% if session.user_id %}
             <span>👤 {{ session.username }}</span>
-            <a href="/new">+ New Note</a>
+            <a href="/new" class="new-note">+ New Note</a>
             <a href="/logout">Logout</a>
         {% endif %}
     </nav>

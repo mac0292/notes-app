@@ -4,16 +4,36 @@
 
 <h1>My Notes</h1>
 
+<form class="search" method="GET" action="/">
+    <input type="text" name="q" placeholder="Search notes..." value="{{ query }}">
+    <button type="submit">Search</button>
+    {% if query %}
+        <a href="/">Clear</a>
+    {% endif %}
+</form>
+
 {% if notes %}
-    {% for note in notes %}
-    <div class="note-card">
-        <h2>{{ note["title"] }}</h2>
-        <p>{{ note["created"] }}</p>
-        <a href="/note/{{ note['id'] }}">View</a>
+    <div class="notes-grid">
+        {% for note in notes %}
+        <a class="note-card" href="/note/{{ note['id'] }}">
+            <div>
+                <h2>{{ note["title"] }}</h2>
+                <p class="date">{{ note["created"] }}</p>
+            </div>
+            <span class="arrow">→</span>
+        </a>
+        {% endfor %}
     </div>
-    {% endfor %}
 {% else %}
-    <p>No notes yet. <a href="/new">Create your first note!</a></p>
+    <div class="empty">
+        {% if query %}
+            <p>No notes found for "<strong>{{ query }}</strong>"</p>
+            <a href="/">Clear search</a>
+        {% else %}
+            <p>No notes yet.</p>
+            <a href="/new">Create your first note</a>
+        {% endif %}
+    </div>
 {% endif %}
 
 {% endblock %}
