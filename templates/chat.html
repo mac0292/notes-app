@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="chat-container">
+
+    <div class="chat-header">
+        <h2>🤖 Journal Assistant</h2>
+        <p>Your personal journaling companion</p>
+    </div>
+
+    <div class="chat-messages" id="messages">
+        {% if not history %}
+            <div class="message assistant">
+                <div class="bubble">
+                    Hi! I'm your personal journaling assistant.
+                    I'm here to help you reflect and journal.
+                    Let's get started! 😊
+                </div>
+            </div>
+        {% endif %}
+
+        {% for msg in history %}
+            <div class="message {{ msg.role }}">
+                <div class="bubble">{{ msg.content }}</div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <form class="chat-input" method="POST" action="/chat/message">
+        <input
+            type="text"
+            name="message"
+            placeholder="Type your message..."
+            autocomplete="off"
+            required
+        >
+        <button type="submit">Send →</button>
+    </form>
+
+</div>
+
+<script>
+    // Auto scroll to bottom of chat
+    const messages = document.getElementById("messages");
+    messages.scrollTop = messages.scrollHeight;
+</script>
+
+{% endblock %}

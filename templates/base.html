@@ -8,13 +8,14 @@
 <body>
 
     <nav>
-        <a href="/">📝 Notes</a>
-        {% if session.user_id %}
-            <span>👤 {{ session.username }}</span>
-            <a href="/new" class="new-note">+ New Note</a>
-            <a href="/logout">Logout</a>
-        {% endif %}
-    </nav>
+    <a href="/">📝 Notes</a>
+    {% if session.user_id %}
+        <span>👤 {{ session.username }}</span>
+        <a href="/chat">🤖 Journal Bot</a>
+        <a href="/new" class="new-note">+ New Note</a>
+        <a href="/logout">Logout</a>
+    {% endif %}
+</nav>
 
     <div class="container">
         {% block content %}
