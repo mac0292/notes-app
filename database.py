@@ -1,34 +1,38 @@
-import sqlite3
 import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 def get_connection():
-    conn = sqlite3.connect("notes.db")
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(
+        os.environ.get("DATABASE_URL"),
+        cursor_factory=RealDictCursor  # lets us access columns by name
+    )
     return conn
 
 def init_db():
     conn = get_connection()
+    cur = conn.cursor()
 
     # Users table
-    conn.execute("""
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            id       SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL
         )
     """)
 
-    # Notes table now has user_id
-    conn.execute("""
+    # Notes table
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS notes (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id  INTEGER NOT NULL,
+            id       SERIAL PRIMARY KEY,
+            user_id  INTEGER NOT NULL REFERENCES users(id),
             title    TEXT NOT NULL,
             content  TEXT NOT NULL,
-            created  TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            created  TIMESTAMP DEFAULT NOW()
         )
     """)
 
     conn.commit()
+    cur.close()
     conn.close()

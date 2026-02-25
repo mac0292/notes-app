@@ -3,28 +3,31 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database import get_connection, init_db
 
 app = Flask(__name__)
-app.secret_key = "your-secret-key-change-this"  # needed for sessions
+app.secret_key = "your-secret-key-change-this"
 init_db()
 
 # ─── Homepage ────────────────────────────────────────────
 @app.route("/")
 def index():
-    if "user_id" not in session:        # not logged in?
-        return redirect(url_for("login"))  # send to login page
+    if "user_id" not in session:
+        return redirect(url_for("login"))
     query = request.args.get("q", "")
     conn = get_connection()
+    cur = conn.cursor()
     if query:
-        notes = conn.execute(
-            """SELECT * FROM notes 
-               WHERE user_id = ? AND (title LIKE ? OR content LIKE ?)
+        cur.execute(
+            """SELECT * FROM notes
+               WHERE user_id = %s AND (title ILIKE %s OR content ILIKE %s)
                ORDER BY created DESC""",
             (session["user_id"], f"%{query}%", f"%{query}%")
-        ).fetchall()
+        )
     else:
-        notes = conn.execute(
-            "SELECT * FROM notes WHERE user_id = ? ORDER BY created DESC",
-            (session["user_id"],)         # only this user's notes!
-        ).fetchall()
+        cur.execute(
+            "SELECT * FROM notes WHERE user_id = %s ORDER BY created DESC",
+            (session["user_id"],)
+        )
+    notes = cur.fetchall()
+    cur.close()
     conn.close()
     return render_template("index.html", notes=notes, query=query)
 
@@ -35,14 +38,16 @@ def signup():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-        hashed   = generate_password_hash(password)  # never store plain password!
+        hashed   = generate_password_hash(password)
         try:
             conn = get_connection()
-            conn.execute(
-                "INSERT INTO users (username, password) VALUES (?, ?)",
+            cur  = conn.cursor()
+            cur.execute(
+                "INSERT INTO users (username, password) VALUES (%s, %s)",
                 (username, hashed)
             )
             conn.commit()
+            cur.close()
             conn.close()
             return redirect(url_for("login"))
         except:
@@ -57,9 +62,12 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
         conn = get_connection()
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT * FROM users WHERE username = %s", (username,)
+        )
+        user = cur.fetchone()
+        cur.close()
         conn.close()
         if user and check_password_hash(user["password"], password):
             session["user_id"]  = user["id"]
@@ -84,11 +92,13 @@ def new_note():
         title   = request.form["title"]
         content = request.form["content"]
         conn = get_connection()
-        conn.execute(
-            "INSERT INTO notes (user_id, title, content) VALUES (?, ?, ?)",
+        cur  = conn.cursor()
+        cur.execute(
+            "INSERT INTO notes (user_id, title, content) VALUES (%s, %s, %s)",
             (session["user_id"], title, content)
         )
         conn.commit()
+        cur.close()
         conn.close()
         return redirect(url_for("index"))
     return render_template("note.html", note=None)
@@ -99,10 +109,13 @@ def view_note(note_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
     conn = get_connection()
-    note = conn.execute(
-        "SELECT * FROM notes WHERE id = ? AND user_id = ?",
+    cur  = conn.cursor()
+    cur.execute(
+        "SELECT * FROM notes WHERE id = %s AND user_id = %s",
         (note_id, session["user_id"])
-    ).fetchone()
+    )
+    note = cur.fetchone()
+    cur.close()
     conn.close()
     return render_template("view.html", note=note)
 
@@ -112,20 +125,24 @@ def edit_note(note_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
     conn = get_connection()
-    note = conn.execute(
-        "SELECT * FROM notes WHERE id = ? AND user_id = ?",
+    cur  = conn.cursor()
+    cur.execute(
+        "SELECT * FROM notes WHERE id = %s AND user_id = %s",
         (note_id, session["user_id"])
-    ).fetchone()
+    )
+    note = cur.fetchone()
     if request.method == "POST":
         title   = request.form["title"]
         content = request.form["content"]
-        conn.execute(
-            "UPDATE notes SET title = ?, content = ? WHERE id = ? AND user_id = ?",
+        cur.execute(
+            "UPDATE notes SET title = %s, content = %s WHERE id = %s AND user_id = %s",
             (title, content, note_id, session["user_id"])
         )
         conn.commit()
+        cur.close()
         conn.close()
         return redirect(url_for("index"))
+    cur.close()
     conn.close()
     return render_template("note.html", note=note)
 
@@ -135,11 +152,13 @@ def delete_note(note_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
     conn = get_connection()
-    conn.execute(
-        "DELETE FROM notes WHERE id = ? AND user_id = ?",
+    cur  = conn.cursor()
+    cur.execute(
+        "DELETE FROM notes WHERE id = %s AND user_id = %s",
         (note_id, session["user_id"])
     )
     conn.commit()
+    cur.close()
     conn.close()
     return redirect(url_for("index"))
 
