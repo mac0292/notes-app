@@ -164,6 +164,7 @@ def delete_note(note_id):
     cur.close()
     conn.close()
     return redirect(url_for("index"))
+# ─── Chat Page ────────────────────────────────────────@app.route("/chat", methods=["GET"])
 # ─── Chat Page ───────────────────────────────────────────
 @app.route("/chat", methods=["GET"])
 def chat():
@@ -185,8 +186,9 @@ def chat():
             (session["user_id"],)
         )
         conn.commit()
+        persona = {"onboarded": False, "goals": "", "habits": "", "summary": ""}
 
-    # Load today's chat history only
+    # Load today's chat history
     cur.execute(
         """SELECT role, content FROM chats
            WHERE user_id = %s
@@ -195,11 +197,22 @@ def chat():
         (session["user_id"],)
     )
     history = [dict(row) for row in cur.fetchall()]
+
+    # If no history today → generate opening message from AI
+    if not history:
+        from ai import get_ai_response
+        opening = get_ai_response([], persona, has_history=False)
+        cur.execute(
+            "INSERT INTO chats (user_id, role, content) VALUES (%s, %s, %s)",
+            (session["user_id"], "assistant", opening)
+        )
+        conn.commit()
+        history = [{"role": "assistant", "content": opening}]
+
     cur.close()
     conn.close()
 
     return render_template("chat.html", history=history)
-
 
 
 # ─── Chat Message ─────────────────────────────────────────
@@ -242,7 +255,8 @@ def chat_message():
 
     # Get AI response
     from ai import get_ai_response, extract_persona, create_or_update_journal
-    ai_reply = get_ai_response(history, persona)
+    has_history = len(history) > 1   # more than just the user's first message
+    ai_reply = get_ai_response(history, persona, has_history)
 
     # Save AI response
     cur.execute(

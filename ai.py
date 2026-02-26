@@ -8,13 +8,12 @@ client = Groq(api_key=os.environ.get("GROK_API_KEY"))
 MODEL  = "llama-3.3-70b-versatile"
 
 # ─── Build System Prompt ─────────────────────────────────
-def build_system_prompt(persona):
+def build_system_prompt(persona, has_history=False):
     """
     Creates the AI's instructions based on user's persona.
-    This runs before every conversation.
     """
 
-    # If user hasn't been onboarded yet
+    # New user — onboarding
     if not persona or not persona["onboarded"]:
         return """
 You are a warm, thoughtful journaling companion.
@@ -32,11 +31,30 @@ After all 4 questions are answered:
 - End your message with exactly: [ONBOARDING_COMPLETE]
 """
 
-    # If user is onboarded — use their persona
     goals   = persona["goals"]   or "not specified"
     habits  = persona["habits"]  or "not specified"
     summary = persona["summary"] or "not specified"
 
+    # Returning user mid conversation
+    if has_history:
+        return f"""
+You are a warm, deeply personal journaling companion.
+
+Here is what you know about this user:
+- Life goals & ambitions: {goals}
+- Daily routine & habits: {habits}
+- Overall summary: {summary}
+
+The user has returned to continue today's conversation.
+DO NOT greet them again — just continue naturally from where you left off.
+Ask a follow up question based on what was already discussed.
+Keep it conversational and personal.
+
+After enough is shared (6-8 messages total), wrap up warmly.
+End your final message with exactly: [JOURNAL_READY]
+"""
+
+    # Fresh start for the day — no history yet
     return f"""
 You are a warm, deeply personal journaling companion.
 
@@ -45,33 +63,31 @@ Here is what you know about this user:
 - Daily routine & habits: {habits}
 - Overall summary: {summary}
 
-Your job in each conversation:
-1. Greet them personally and ask how they are doing today
-2. Ask 3-4 thoughtful questions based on THEIR specific goals and habits
-   For example if their goal is fitness ask about their workout today
-   If their goal is career growth ask about work challenges
-3. Listen carefully and ask follow up questions
-4. Keep conversation natural, warm and focused
-5. After enough is shared (6-8 messages), wrap up the conversation
-6. End your final message with exactly: [JOURNAL_READY]
+This is the START of a new conversation today.
+Greet them in a fresh, unique way every single time based on their persona.
 
-Important rules:
-- Always reference their specific goals and habits
-- Never ask generic questions — make it personal
-- Be encouraging and supportive
-- Keep messages short and conversational
+Rules for greeting:
+- NEVER say the same greeting twice
+- Reference something specific from their goals or habits
+- Ask ONE specific opening question tied to their life
+- Keep it short, warm and personal
+
+Examples of good personalised openings (don't copy these exactly):
+- "Hey! How did the workout go today? I know staying consistent has been on your mind."
+- "Good to see you! Did you make progress on that project you've been working towards?"
+- "Hey! How's the day treating you — did the routine feel easier today?"
+
+After the opening, ask 3-4 more thoughtful follow up questions naturally.
+End your final message with exactly: [JOURNAL_READY]
 """
 
 # ─── Get AI Response ─────────────────────────────────────
-def get_ai_response(messages, persona):
+def get_ai_response(messages, persona, has_history=False):
     """
     Sends conversation history to Groq and gets a response.
-    messages = list of past messages in this conversation
-    persona  = user's profile from database
     """
-    system_prompt = build_system_prompt(persona)
+    system_prompt = build_system_prompt(persona, has_history)
 
-    # Build the full message list for Groq
     full_messages = [
         {"role": "system", "content": system_prompt}
     ] + messages
@@ -80,7 +96,7 @@ def get_ai_response(messages, persona):
         model=MODEL,
         messages=full_messages,
         max_tokens=500,
-        temperature=0.7      # 0 = robotic, 1 = creative
+        temperature=0.9      # higher = more creative & varied responses
     )
 
     return response.choices[0].message.content
