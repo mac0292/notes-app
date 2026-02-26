@@ -10,16 +10,6 @@
     </div>
 
     <div class="chat-messages" id="messages">
-        {% if not history %}
-            <div class="message assistant">
-                <div class="bubble">
-                    Hi! I'm your personal journaling assistant.
-                    I'm here to help you reflect and journal.
-                    Let's get started! 😊
-                </div>
-            </div>
-        {% endif %}
-
         {% for msg in history %}
             <div class="message {{ msg.role }}">
                 <div class="bubble">{{ msg.content }}</div>
@@ -27,23 +17,108 @@
         {% endfor %}
     </div>
 
-    <form class="chat-input" method="POST" action="/chat/message">
+    <div class="chat-input">
         <input
             type="text"
-            name="message"
+            id="messageInput"
             placeholder="Type your message..."
             autocomplete="off"
-            required
         >
-        <button type="submit">Send →</button>
-    </form>
+        <button id="sendBtn" onclick="sendMessage()">Send →</button>
+    </div>
 
 </div>
 
 <script>
-    // Auto scroll to bottom of chat
-    const messages = document.getElementById("messages");
-    messages.scrollTop = messages.scrollHeight;
+    // ── Scroll to bottom ──────────────────────────────────
+    function scrollToBottom() {
+        const messages = document.getElementById("messages");
+        messages.scrollTop = messages.scrollHeight;
+    }
+    scrollToBottom();
+
+    // ── Add message bubble to UI ──────────────────────────
+    function addMessage(role, content) {
+        const messages = document.getElementById("messages");
+        const div      = document.createElement("div");
+        div.className  = `message ${role}`;
+        div.innerHTML  = `<div class="bubble">${content}</div>`;
+        messages.appendChild(div);
+        scrollToBottom();
+    }
+
+    // ── Typing indicator ──────────────────────────────────
+    function showTyping() {
+        const messages = document.getElementById("messages");
+        const div      = document.createElement("div");
+        div.className  = "message assistant";
+        div.id         = "typing";
+        div.innerHTML  = `<div class="bubble typing">
+                            <span></span><span></span><span></span>
+                          </div>`;
+        messages.appendChild(div);
+        scrollToBottom();
+    }
+
+    function hideTyping() {
+        const typing = document.getElementById("typing");
+        if (typing) typing.remove();
+    }
+
+    // ── Send message ──────────────────────────────────────
+    async function sendMessage() {
+        const input  = document.getElementById("messageInput");
+        const button = document.getElementById("sendBtn");
+        const text   = input.value.trim();
+
+        if (!text) return;
+
+        // Show user message immediately
+        addMessage("user", text);
+        input.value = "";
+
+        // Disable input while waiting
+        input.disabled    = true;
+        button.disabled   = true;
+        button.textContent = "..."
+
+        // Show typing indicator
+        showTyping();
+
+        try {
+            const response = await fetch("/chat/send", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({message: text})
+            });
+
+            const data = await response.json();
+
+            // Hide typing, show response
+            hideTyping();
+            addMessage("assistant", data.reply);
+
+            // Show journal saved notification
+            if (data.journal_saved) {
+                addMessage("assistant", "✅ Journal entry saved to your notes!");
+            }
+
+        } catch (error) {
+            hideTyping();
+            addMessage("assistant", "Something went wrong. Please try again.");
+        }
+
+        // Re-enable input
+        input.disabled    = false;
+        button.disabled   = false;
+        button.textContent = "Send →";
+        input.focus();
+    }
+
+    // ── Send on Enter key ─────────────────────────────────
+    document.getElementById("messageInput").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") sendMessage();
+    });
 </script>
 
 {% endblock %}

@@ -338,5 +338,123 @@ def chat_message():
 
     return redirect(url_for("chat"))
 
+# ─── Chat API (AJAX) ─────────────────────────────────────
+@app.route("/chat/send", methods=["POST"])
+def chat_send():
+    if "user_id" not in session:
+        return {"error": "Not logged in"}, 401
+
+    user_message = request.json.get("message")
+    user_id      = session["user_id"]
+
+    conn = get_connection()
+    cur  = conn.cursor()
+
+    # Load persona
+    cur.execute(
+        "SELECT * FROM personas WHERE user_id = %s",
+        (user_id,)
+    )
+    persona = cur.fetchone()
+
+    # Load today's history
+    cur.execute(
+        """SELECT role, content FROM chats
+           WHERE user_id = %s
+           AND created::date = CURRENT_DATE
+           ORDER BY created ASC""",
+        (user_id,)
+    )
+    history = [dict(row) for row in cur.fetchall()]
+
+    # Save user message
+    cur.execute(
+        "INSERT INTO chats (user_id, role, content) VALUES (%s, %s, %s)",
+        (user_id, "user", user_message)
+    )
+    conn.commit()
+
+    history.append({"role": "user", "content": user_message})
+
+    # Get AI response
+    from ai import get_ai_response, extract_persona, create_or_update_journal
+    has_history = len(history) > 1
+    ai_reply    = get_ai_response(history, persona, has_history)
+
+    # Save AI response
+    cur.execute(
+        "INSERT INTO chats (user_id, role, content) VALUES (%s, %s, %s)",
+        (user_id, "assistant", ai_reply)
+    )
+    conn.commit()
+
+    history.append({"role": "assistant", "content": ai_reply})
+
+    # Handle onboarding
+    if "[ONBOARDING_COMPLETE]" in ai_reply:
+        persona_data = extract_persona(history)
+        cur.execute(
+            """UPDATE personas
+               SET goals = %s, habits = %s, summary = %s, onboarded = TRUE
+               WHERE user_id = %s""",
+            (persona_data["goals"], persona_data["habits"],
+             persona_data["summary"], user_id)
+        )
+        conn.commit()
+        ai_reply = ai_reply.replace("[ONBOARDING_COMPLETE]", "").strip()
+
+    # Save/update journal
+    if persona and persona["onboarded"]:
+        cur.execute(
+            """SELECT dj.note_id, n.content FROM daily_journals dj
+               JOIN notes n ON n.id = dj.note_id
+               WHERE dj.user_id = %s AND dj.date = CURRENT_DATE""",
+            (user_id,)
+        )
+        existing        = cur.fetchone()
+        existing_content = existing["content"] if existing else None
+        title, content  = create_or_update_journal(
+            history, persona, existing_content
+        )
+        if existing:
+            cur.execute(
+                "UPDATE notes SET title = %s, content = %s WHERE id = %s",
+                (title, content, existing["note_id"])
+            )
+        else:
+            cur.execute(
+                """INSERT INTO notes (user_id, title, content)
+                   VALUES (%s, %s, %s) RETURNING id""",
+                (user_id, title, content)
+            )
+            note_id = cur.fetchone()["id"]
+            cur.execute(
+                "INSERT INTO daily_journals (user_id, note_id) VALUES (%s, %s)",
+                (user_id, note_id)
+            )
+        persona_data = extract_persona(history)
+        cur.execute(
+            """UPDATE personas
+               SET goals = %s, habits = %s, summary = %s, updated_at = NOW()
+               WHERE user_id = %s""",
+            (persona_data["goals"], persona_data["habits"],
+             persona_data["summary"], user_id)
+        )
+        conn.commit()
+
+    # Handle journal ready
+    journal_saved = False
+    if "[JOURNAL_READY]" in ai_reply:
+        ai_reply     = ai_reply.replace("[JOURNAL_READY]", "").strip()
+        journal_saved = True
+
+    cur.close()
+    conn.close()
+
+    return {
+        "reply":        ai_reply,
+        "journal_saved": journal_saved
+    }
+
 if __name__ == "__main__":
     app.run(debug=True)
